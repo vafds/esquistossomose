@@ -1,0 +1,346 @@
+#Carrega as bibliotecas
+library(shiny)
+library(plotly)
+library(dplyr)
+library(shinythemes)
+library(leaflet)
+library(ggplot2)
+library(sf)
+library(patchwork)
+library(foreign)
+library(shinycssloaders)
+library(htmltools)
+library(rmarkdown)
+library(jsonlite)
+library(rsconnect)
+
+
+#carregar dados para o botão de seleção do município
+df <- read.csv("input_possibilidade.csv")
+df_class <- read.csv("input_classificacao.csv")
+  
+#início do frontend
+ui <- fluidPage(
+  #escolha do tema de cores do Shiny
+  theme = shinytheme("flatly"),
+#inclui a barra de navegação no topo da página
+  navbarPage(" ", 
+             #inclui a página do painel da classificação
+             tabPanel("Classificação das paisagens",
+#configura a barra lateral da página
+    sidebarLayout(
+    sidebarPanel(div(style = "height:100vh",
+                     h3("Classificação das paisagens associada à esquistossomose nos municípios da bacia do Médio Paranapanema"),
+                     br(),
+                     #inclui o menu de seleção de município
+                     selectizeInput(inputId = "dv_class", label = "Selecione o município", 
+                                 choices = sort(unique(df_class$NM_MUN)),
+                                 selected = "Todos",
+                                 multiple = FALSE),
+                     h5("Legenda:"),
+                     img(src="legenda_classificacao.png", height= 48,width=350),
+                     hr(style="border-top: 1px dotted #c5c5c5;"),
+                     (div(style = "text-align: justify",
+                     h4("Este painel apresenta o resultado da classificação das paisagens associada à esquistossomose nos municípios da bacia do Médio Paranapanema, São Paulo, realizada 
+                     como parte da dissertação de mestrado de Vivian Alessandra Ferreira da Silva, no Programa de Pós Graduação em Sensoriamento Remoto do Instituto 
+                     Nacional de Pesquisas Espaciais (PGSER/INPE)."),
+                     br(),
+                     h4("A classificação foi realizada a partir da Tipologia de padrões de paisagens associados à produção da esquistossomose na Bacia 
+                     do Médio Paranapanema, disponível na aba Tipologia."),
+                     br(),
+                     h4("Os 10 tipos encontrados na área de estudo são espacializados no mapa e suas respectivas áreas de cobertura são mostradas no gráfico. 
+                     A seleção de um município nesta barra lateral atualiza os dados para a divisão político-administrativa escolhida.")))
+    )),
+#incluir o corpo da página da classificação
+    mainPanel(
+      #input dos plots e textos da página
+      span(textOutput("text_class"), style = "text-transform:uppercase; color:#3268a8 ; font-size: 30px; font-style:bold"),
+      #spinner de carregamento do mapa
+      shinycssloaders::withSpinner(
+        leafletOutput(outputId = "Mapa_class"),
+        type = 5,
+        color = "orange",
+        size = 1
+      ),
+      br(),
+      plotlyOutput(outputId = "plot_class", width = "100%"),
+    )
+  ),
+              ),
+
+ #inclui a segunda página com o mapa de focos e criadouros 
+            tabPanel("Possibilidade de ocorrência de focos e criadouros",
+              sidebarLayout(
+              sidebarPanel(div(style = "height:100vh",
+                            h3("Possibilidade de ocorrência de focos e criadouros de esquistossomose na bacia do Médio Paranapanema"),
+                            br(),
+                            #inclui botão de seleção do município
+                            selectizeInput(inputId = "dv", label = "Selecione o município", 
+                                           choices = sort(unique(df$NM_MUN)),
+                                           selected = NULL,
+                                           multiple = FALSE),
+                            h5("Legenda:"),
+                            img(src="legenda_possibilidade5.png", height= 80,width=280),
+                            #hr(style="border-top: 1px dotted #c5c5c5; text-align: justify"),
+                            h5("*Os municípios que não possuem sua sede dentro dos limites da bacia são chamados de 'municípios com área contida na bacia'."),
+                            hr(style="border-top: 1px dotted #c5c5c5;"),
+                            div(style = "text-align: justify",
+                            h4("Este painel apresenta um refinamento do resultado da classificação das paisagens. Os tipos foram agregados para gerar 
+                                um produto cartográfico de interpretação facilitada que mostra onde existe maior ou menor possibilidade de haver 
+                              criadouros dos caramujos hospedeiros intermediários da esquistossomose ou focos da doença."),
+                            br(),
+                            h4("Os tipos 1 e 2 foram agregados para formar a classe 'Maior possibilidade de ocorrência de focos de esquistossomose'."),
+                            h4("Os tipos 3 e 4 formam a classe 'Maior possibilidade de ocorrência de criadouros' de caramujos hospedeiros intermediários."),
+                            h4("Os tipos de 5 a 10 foram a classe 'Menor possibilidade de ocorrência de focos e criadouros'.")),
+                            br(),
+                            #h4("O gradiente de possibilidades de ocorrência de criadouros dos caramujos hospedeiros intermediários da esquistossomose ou 
+                            #focos da doença na área de estudo são espacializados no mapa, enquanto o gráfico apresenta as porcentagens correspondetes à 
+                            #cobertura de cada classe. A seleção de um município nesta barra lateral atualiza os dados para a divisão político-administrativa escolhida.")
+           )),
+ #inclui o corpo da página e os elementos do segundo dashboard
+            mainPanel(
+             span(textOutput("text"), style = "text-transform:uppercase; color:#3268a8 ; font-size: 30px; font-style:bold"),
+             #spinner de carregamento do mapa
+             shinycssloaders::withSpinner(
+               leafletOutput(outputId = "Mapa"),
+               type = 5,
+               color = "orange",
+               size = 1
+             ),
+             br(),
+             plotlyOutput(outputId = "plot", width = "100%")
+
+           )
+         )
+         ),
+         
+#inclui a terceira página com um arquivo PDF como iframe
+            tabPanel("Tipologia",
+                  tags$iframe(style="height:800px; width:100%; scrolling=yes", 
+                              src="tipologia.pdf")
+                  ),
+  
+ #inclui a quarta página com um arquivo PDF como iframe
+            tabPanel("Matriz de confusão",
+                  tags$iframe(style="height:800px; width:100%; scrolling=yes", 
+                       src="matriz_confusao2.pdf")
+            ),
+  
+#rodapé de todas as páginas
+         hr(style="border-top: 1px dotted #e5e5e5;"),
+         div(style = "height:52; background-color:#ffffff;",
+             img(src="logo_inpe.png", height=62,width=55),
+             img(src="logo_liss.png", height=64,width=69),
+             img(src="logo_moceans.png", height=53,width=67),
+             img(src="logo_pasteur.png", height=52,width=52),
+             img(src="logo_capes.png", height=52,width=52),
+             img(src="logo_fapesp.png", height=17,width=58),
+             img(src="logo_sp.png", height=26,width=74)),
+         )
+  )
+
+#início do backend
+server <- function(input, output, session) {
+#---------------- primeira página --------------------------
+#Filtra os dados escolhidos no menu da barra lateral
+  filtered_data_class <- reactive({
+    subset(df_class, df_class$NM_MUN == input$dv_class)
+  })
+  
+#Inclui o texto com o nome do município selecionado
+  output$text_class <- renderText({
+    paste(input$dv_class)
+  })
+  
+#gera o gráfico com os dados escolhidos no menu da barra lateral
+  output$plot_class <- renderPlotly({
+    filtered_data_class() %>% 
+      plot_ly(x = ~class_txt, y = ~porc_area, type = "bar", color = ~class_txt, colors = c('#ab2296', '#015426', '#cb4778', '#fdff9f', '#f2f822', '#ffe44b', '#fec329', '#deaa26', '#a1cc61', '#19a658' ),
+              hovertemplate = paste('<br>Tipo:', '%{x}', ',<br>Área:', '%{y:.s}%'),
+              texttemplate ='%{y:.s}', textposition = 'outside') %>% 
+      layout(title = paste("área de cada tipo de paisagem em", {input$dv_class}, "(%)"), xaxis = list(title = "Tipo"), yaxis = list(title = "% em relação à área total do município"))%>%
+      layout(xaxis = list(categoryorder = "array",
+                          categoryarray = c("Tipo 1", "Tipo 2", "Tipo 3", "Tipo 4", "Tipo 5", "Tipo 6", "Tipo 7", "Tipo 8", "Tipo 9", "Tipo 10")),
+             legend = list(title=list(text='<b> Tipo de paisagem </b>'))) %>% 
+      hide_colorbar() %>% 
+      highlight(on = 'plotly_click', off = "plotly_doubleclick", selectize = TRUE, persistent = FALSE)
+  })
+
+  
+#seleciona os dados do menu da barra lateral para o mapa
+  limites_selecao <- reactive({
+    x <- subset(limites, limites$NM_MUN == input$dv_class)
+    return(x)
+  })
+  
+#define a fonte dos dados shapefile para gerar o mapa
+  shpclass = st_read(dsn = "input_classificacao.geojson")
+    limites = st_read(dsn = "limites_muni.geojson")
+ 
+#paleta de cores e legenda do mapa
+  pal <- c('#ab2296', '#015426', '#cb4778', '#fdff9f', '#f2f822', '#ffe44b', '#fec329', '#deaa26', '#a1cc61', '#19a658')
+  factpal <- colorFactor(palette = c('#ab2296', '#015426', '#cb4778', '#fdff9f', '#f2f822', '#ffe44b', '#fec329', '#deaa26', '#a1cc61', '#19a658'), domain = shpclass$class)
+  legenda <- c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  
+# gera o mapa 
+  output$Mapa_class <- renderLeaflet({
+    leaflet() %>%
+      leaflet(options = leafletOptions(zoomControl = FALSE)) %>% 
+      addProviderTiles("Esri.WorldImagery", group = "Esri World Imagery", options = providerTileOptions(minZoom = 2, maxZoom = 17))%>% 
+      setView(-49.67, -22.69, zoom = 9) %>% 
+      #fit23, -21.95) %>% 
+      addPolygons(data = shpclass,
+                  color = ~factpal(class), weight = 0,
+                  opacity = 0.5, fillOpacity = 0.5,
+                  fillColor = ~factpal(class),
+                  group = "Classificação"
+      ) %>% 
+      addPolygons(data = limites_selecao(),
+                  highlightOptions = highlightOptions(color = "#ffffff", weight = 2, bringToFront = TRUE),
+                  color = "white", weight = 2.5,
+                  opacity = 2, fillOpacity = 0
+      ) %>% 
+      addPolygons(data = limites,
+                  color = "#444444", weight = 0.1,
+                  fillColor = "red",
+                  opacity = 0.8, fillOpacity = 0,
+                  label = ~htmlEscape(NM_MUN),
+                  highlightOptions = highlightOptions(color = "black", weight = 2.5, bringToFront = TRUE)
+                  ) %>% 
+  
+#adiciona o slider de opacidade ao mapa
+      addControl(html = "<input id=\"OpacitySlide\" type=\"range\" min=\"0\" max=\"1\" step=\"0.1\" value=\"0.5\">") %>%   
+      #adiciona o Slider
+      htmlwidgets::onRender(
+        "function(el,x,data){
+                     var map = this;
+                       L.control.zoom({ position: 'topright' }).addTo(this)
+                     var evthandler = function(e){
+                        var layers = map.layerManager.getVisibleGroups();
+                        console.log('VisibleGroups: ', layers); 
+                        console.log('Target value: ', +e.target.value);
+                        layers.forEach(function(group) {
+                          var layer = map.layerManager._byGroup[group];
+                          console.log('currently processing: ', group);
+                          Object.keys(layer).forEach(function(el){
+                            if(layer[el] instanceof L.Polygon){;
+                            console.log('Change opacity of: ', group, el);
+                             layer[el].setStyle({fillOpacity:+e.target.value});
+                            }
+                          });
+                          
+                        })
+                     };
+              $('#OpacitySlide').mousedown(function () { map.dragging.disable(); });
+              $('#OpacitySlide').mouseup(function () { map.dragging.enable(); });
+              $('#OpacitySlide').on('input', evthandler)}
+          ")
+  })
+  
+
+  
+#---------------- Inicia painel 2 ---------------------
+#Filtra os dados escolhidos no menu da barra lateral
+  filtered_data <- reactive({
+    subset(df, df$NM_MUN == input$dv)
+      })
+#Inclui o texto com o nome do município selecionado 
+  output$text <- renderText({
+    paste(input$dv)
+  })
+  
+#gera o gráfico com os dados escolhidos no menu da barra lateral
+  output$plot <- renderPlotly({
+    filtered_data() %>% 
+      plot_ly(x =~classe_txt, y = ~porc_area, type = "bar", color = ~classe_txt, colors = c('#ff5d00','#dcdc00', '#00a9a9'), 
+        hovertemplate = paste('<br>Classe:', '%{x}', ',<br>Área:', '%{y:.s}%'),
+        texttemplate ='%{y:.s}', textposition = 'outside') %>% 
+      layout(title = paste("área do município segundo a classe em",  {input$dv}, "(%)"), xaxis = list(title = "Classe"), yaxis = list(title = "% em relação à área total do município"))%>%
+      layout(xaxis = list(showticklabels = FALSE),
+             legend = list(orientation = "v",
+                                      xanchor = "left",
+                                      x = 0, 
+                                      y = 0.98)) %>% 
+      hide_colorbar() %>% 
+      highlight(on = 'plotly_click', off = "plotly_doubleclick", selectize = TRUE, persistent = FALSE)
+  })
+  
+#define a fonte dos dados shapefile para gerar o mapa
+  bacia = st_read(dsn = "input_possibilidade.geojson")
+  limites2 = st_read(dsn = "limites_muni.geojson")
+  
+    
+#seleciona os dados do menu da barra lateral para o mapa
+  limites2_selecao <- reactive({
+    x <- subset(limites2, limites2$NM_MUN == input$dv)
+    return(x)
+  })
+
+#paleta de cores e legenda do mapa
+  pal2 <- c('#ff5d00','#dcdc00', '#00a9a9')
+  factpal2 <- colorFactor(palette =  c('#ff5d00','#dcdc00', '#00a9a9'), domain = bacia$classe)
+  legenda2 <- c(1,2,3)
+  
+  
+#Instruções para o Leaflet gerar o mapa 
+  output$Mapa <- renderLeaflet({
+      leaflet() %>%
+      leaflet(options = leafletOptions(zoomControl = FALSE)) %>% 
+      addProviderTiles("Esri.WorldImagery", group = "Esri World Imagery", options = providerTileOptions(minZoom = 2, maxZoom = 17))%>% 
+      setView(-49.79, -22.71, zoom = 9) %>% 
+      addPolygons(data = bacia,
+                  color = ~factpal2(classe), weight = 0,
+                  opacity = 0.5, fillOpacity = 0.5,
+                  fillColor = ~factpal2(classe),
+                  group = "Possibilidade"
+      ) %>% 
+      addPolygons(data = limites2_selecao(),
+                  highlightOptions = highlightOptions(color = "#ffffff", weight = 2, bringToFront = TRUE),
+                  color = "white", weight = 2.5,
+                  opacity = 1, fillOpacity = 0
+                  ) %>% 
+      addPolygons(data = limites2,
+                  color = "#444444", weight = 0.1,
+                  fillColor = "red",
+                  opacity = 0.8, fillOpacity = 0,
+                  label = ~htmlEscape(NM_MUN),
+                  highlightOptions = highlightOptions(color = "black", weight = 2.5, bringToFront = TRUE)
+      ) %>% 
+
+#adiciona o slider de opacidade ao mapa
+      addControl(html = "<input id=\"OpacitySlide\" type=\"range\" min=\"0\" max=\"1\" step=\"0.1\" value=\"0.5\">") %>%   
+      #adiciona o Slider
+      htmlwidgets::onRender(
+        "function(el,x,data){
+                     var map = this;
+                       L.control.zoom({ position: 'topright' }).addTo(this)
+                     var evthandler = function(e){
+                        var layers = map.layerManager.getVisibleGroups();
+                        console.log('VisibleGroups: ', layers); 
+                        console.log('Target value: ', +e.target.value);
+                        layers.forEach(function(group) {
+                          var layer = map.layerManager._byGroup[group];
+                          console.log('currently processing: ', group);
+                          Object.keys(layer).forEach(function(el){
+                            if(layer[el] instanceof L.Polygon){;
+                            console.log('Change opacity of: ', group, el);
+                             layer[el].setStyle({fillOpacity:+e.target.value});
+                            }
+                          });
+                          
+                        })
+                     };
+              $('#OpacitySlide').mousedown(function () { map.dragging.disable(); });
+              $('#OpacitySlide').mouseup(function () { map.dragging.enable(); });
+              $('#OpacitySlide').on('input', evthandler)}
+          ")
+  })
+}
+
+
+#Possibilita a alternância entre as abas do tabpanel
+if (interactive()) {
+  shinyApp(ui, server)
+}
+
+shinyApp(ui = ui, server = server)
